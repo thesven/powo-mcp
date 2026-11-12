@@ -30,6 +30,8 @@ Provides authoritative botanical taxonomy, accepted species resolution, lifeform
 | `get_plant_distribution` | Retrieve native and introduced TDWG geographic distribution lists. |
 | `verify_plant_native_status` | Verify whether a plant taxon is native or introduced in a target region or country. |
 | `resolve_plant_synonymy` | Check if a botanical name is accepted or an invalid synonym. |
+| `get_plant_characteristics` | Retrieve botanical characteristics, morphology, habit, and flowering descriptions. |
+| `get_plant_images` | Retrieve Kew Herbarium specimen sheets and living collection photographic records. |
 
 ---
 

@@ -111,6 +111,39 @@ def create_server(client: PowoClient | None = None) -> MCPServer:
         except PowoError as exc:
             return {"error": str(exc), "summary": f"Native status verification failed: {exc}"}
 
+    @server.tool()
+    def get_plant_characteristics(fq_id: str) -> dict[str, Any]:
+        """Retrieve botanical characteristics, morphology, habit, and flowering descriptions."""
+        try:
+            char_data = api.get_plant_characteristics(fq_id=fq_id)
+            descs = char_data.get("characteristics", [])
+            lines = [
+                f"Characteristics for {char_data.get('species')} ({char_data.get('family')}):",
+                f"Lifeform: {char_data.get('lifeform')} | Climate: {char_data.get('climate')}",
+            ]
+            for d in descs:
+                lines.append(f"- {d.get('heading')}: {d.get('description')}")
+            summary = "\n".join(lines)
+            return {"characteristics": char_data, "summary": summary}
+        except PowoError as exc:
+            return {"error": str(exc), "summary": f"Characteristics lookup failed: {exc}"}
+
+    @server.tool()
+    def get_plant_images(fq_id: str, limit: int = 10) -> dict[str, Any]:
+        """Retrieve Kew Herbarium specimen sheets and living collection photographic records."""
+        try:
+            img_data = api.get_plant_images(fq_id=fq_id, limit=limit)
+            imgs = img_data.get("images", [])
+            lines = [f"Images for {img_data.get('species')} ({len(imgs)} records):"]
+            for img in imgs:
+                caption = img.get("caption") or "Specimen"
+                url = img.get("fullsize") or img.get("thumbnail") or "No URL"
+                lines.append(f"- {caption}: {url} (© {img.get('copyright')})")
+            summary = "\n".join(lines) if imgs else f"No specimen images found for {fq_id}."
+            return {"images": img_data, "summary": summary}
+        except PowoError as exc:
+            return {"error": str(exc), "summary": f"Image lookup failed: {exc}"}
+
     return server
 
 

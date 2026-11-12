@@ -37,6 +37,10 @@ def mock_client() -> PowoClient:
                     "taxonomicStatus": "Accepted",
                     "lifeform": "Tree",
                     "climate": "Temperate",
+                    "descriptions": [{"heading": "Habit", "description": "Large tree"}],
+                    "images": [
+                        {"thumbnail": "thumb.jpg", "fullsize": "full.jpg", "copyright": "Kew"}
+                    ],
                     "distribution": {
                         "natives": [{"name": "North America"}],
                         "introduced": [],
@@ -67,6 +71,8 @@ async def test_server_tools(mock_client: PowoClient) -> None:
     assert "get_plant_distribution" in tool_names
     assert "resolve_plant_synonymy" in tool_names
     assert "verify_plant_native_status" in tool_names
+    assert "get_plant_characteristics" in tool_names
+    assert "get_plant_images" in tool_names
 
     res = await server.call_tool("search_plants", {"query": "Quercus alba"})
     assert "Quercus alba" in res.content[0].text
@@ -86,6 +92,12 @@ async def test_server_tools(mock_client: PowoClient) -> None:
     )
     assert "NATIVE" in res.content[0].text
 
+    res = await server.call_tool("get_plant_characteristics", {"fq_id": "urn:test:p1"})
+    assert "Large tree" in res.content[0].text
+
+    res = await server.call_tool("get_plant_images", {"fq_id": "urn:test:p1"})
+    assert "full.jpg" in res.content[0].text
+
 
 @pytest.mark.asyncio
 async def test_server_tool_errors(failing_client: PowoClient) -> None:
@@ -103,4 +115,10 @@ async def test_server_tool_errors(failing_client: PowoClient) -> None:
     res = await server.call_tool(
         "verify_plant_native_status", {"query": "NonexistentUnknownPlant", "target_region": "Space"}
     )
+    assert "failed" in res.content[0].text
+
+    res = await server.call_tool("get_plant_characteristics", {"fq_id": "urn:nonexistent:id"})
+    assert "failed" in res.content[0].text
+
+    res = await server.call_tool("get_plant_images", {"fq_id": "urn:nonexistent:id"})
     assert "failed" in res.content[0].text

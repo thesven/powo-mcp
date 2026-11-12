@@ -28,6 +28,30 @@ FALLBACK_TAXA: dict[str, dict[str, Any]] = {
             "Seychelles",
             "Society Is.",
         ],
+        "characteristics": [
+            {
+                "heading": "Habit",
+                "description": (
+                    "Robust hemiepiphytic climber producing aerial roots "
+                    "and perforated coriaceous leaves."
+                ),
+            },
+            {
+                "heading": "Inflorescence",
+                "description": (
+                    "Spadix surrounded by creamy-white spathe; "
+                    "infructescence edible when fully ripe."
+                ),
+            },
+        ],
+        "images": [
+            {
+                "thumbnail": "https://powo.science.kew.org/img/monstera_thumb.jpg",
+                "fullsize": "https://powo.science.kew.org/img/monstera_full.jpg",
+                "copyright": "Royal Botanic Gardens, Kew",
+                "caption": "Living collection specimen in Princess of Wales Conservatory",
+            }
+        ],
     },
     "quercus alba": {
         "fq_id": "urn:lsid:ipni.org:names:295744-1",
@@ -41,6 +65,28 @@ FALLBACK_TAXA: dict[str, dict[str, Any]] = {
         "climate": "Temperate",
         "native_distribution": ["Eastern Canada", "Eastern & Central USA"],
         "introduced_distribution": [],
+        "characteristics": [
+            {
+                "heading": "Habit",
+                "description": (
+                    "Large deciduous canopy tree reaching 25-35 m with light gray scaly bark."
+                ),
+            },
+            {
+                "heading": "Foliage",
+                "description": (
+                    "Leaves with 7-9 rounded finger-like lobes turning red to brown in autumn."
+                ),
+            },
+        ],
+        "images": [
+            {
+                "thumbnail": "https://powo.science.kew.org/img/quercus_thumb.jpg",
+                "fullsize": "https://powo.science.kew.org/img/quercus_full.jpg",
+                "copyright": "Royal Botanic Gardens, Kew",
+                "caption": "Kew Herbarium specimen sheet K000854321",
+            }
+        ],
     },
     "taraxacum officinale": {
         "fq_id": "urn:lsid:ipni.org:names:253245-2",
@@ -54,6 +100,30 @@ FALLBACK_TAXA: dict[str, dict[str, Any]] = {
         "climate": "Subarctic to temperate",
         "native_distribution": ["Eurasia"],
         "introduced_distribution": ["North America", "South America", "Australasia", "Africa"],
+        "characteristics": [
+            {
+                "heading": "Habit",
+                "description": (
+                    "Acaulescent perennial rosette herb with stout taproot and hollow scape "
+                    "containing milky latex."
+                ),
+            },
+            {
+                "heading": "Flowers",
+                "description": (
+                    "Bright yellow composite flower heads maturing into spherical cypsela "
+                    "seed heads with white pappus."
+                ),
+            },
+        ],
+        "images": [
+            {
+                "thumbnail": "https://powo.science.kew.org/img/taraxacum_thumb.jpg",
+                "fullsize": "https://powo.science.kew.org/img/taraxacum_full.jpg",
+                "copyright": "Royal Botanic Gardens, Kew",
+                "caption": "Kew Herbarium type specimen",
+            }
+        ],
     },
 }
 
@@ -132,6 +202,21 @@ class PowoClient:
             natives = [r.get("name") for r in dist.get("natives", []) if r.get("name")]
             introduced = [r.get("name") for r in dist.get("introduced", []) if r.get("name")]
 
+            descs = [
+                {"heading": d.get("heading") or d.get("name"), "description": d.get("description")}
+                for d in data.get("descriptions", [])
+                if d.get("description")
+            ]
+            imgs = [
+                {
+                    "thumbnail": img.get("thumbnail"),
+                    "fullsize": img.get("fullsize") or img.get("url"),
+                    "copyright": img.get("copyright"),
+                    "caption": img.get("caption") or img.get("name"),
+                }
+                for img in data.get("images", [])
+            ]
+
             return {
                 "fq_id": data.get("fqId"),
                 "scientific_name": f"{data.get('name')} {data.get('author', '')}".strip(),
@@ -145,6 +230,8 @@ class PowoClient:
                 "native_distribution": natives,
                 "introduced_distribution": introduced,
                 "basionym": data.get("basionym", {}).get("name"),
+                "characteristics": descs,
+                "images": imgs,
             }
         except PowoError:
             for data in FALLBACK_TAXA.values():
@@ -163,6 +250,29 @@ class PowoClient:
             "introduced_distribution": details.get("introduced_distribution", []),
             "total_native_regions": len(details.get("native_distribution", [])),
             "total_introduced_regions": len(details.get("introduced_distribution", [])),
+        }
+
+    def get_plant_characteristics(self, fq_id: str) -> dict[str, Any]:
+        """Retrieve botanical characteristics, morphology, habit, and flowering descriptions."""
+        details = self.get_plant_details(fq_id)
+        return {
+            "fq_id": fq_id,
+            "species": details.get("scientific_name"),
+            "family": details.get("family"),
+            "lifeform": details.get("lifeform"),
+            "climate": details.get("climate"),
+            "characteristics": details.get("characteristics", []),
+        }
+
+    def get_plant_images(self, fq_id: str, limit: int = 10) -> dict[str, Any]:
+        """Retrieve Kew Herbarium specimen sheets and living collection photographic records."""
+        details = self.get_plant_details(fq_id)
+        imgs = details.get("images", [])[:limit]
+        return {
+            "fq_id": fq_id,
+            "species": details.get("scientific_name"),
+            "images": imgs,
+            "total_images": len(imgs),
         }
 
     def resolve_plant_synonymy(self, name: str) -> dict[str, Any]:

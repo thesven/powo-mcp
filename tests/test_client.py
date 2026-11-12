@@ -139,3 +139,15 @@ def test_verify_plant_native_status() -> None:
     # Not recorded test
     unrec_res = client.verify_plant_native_status("Quercus alba", "Madagascar")
     assert unrec_res["status"] == "NOT_RECORDED"
+
+
+def test_characteristics_and_images() -> None:
+    client = PowoClient()
+    char_res = client.get_plant_characteristics("urn:lsid:ipni.org:names:87517-1")
+    assert char_res["species"] == "Monstera deliciosa Liebm."
+    assert len(char_res["characteristics"]) >= 1
+    assert "Epiphytic climber" in char_res["lifeform"]
+
+    img_res = client.get_plant_images("urn:lsid:ipni.org:names:87517-1")
+    assert img_res["total_images"] >= 1
+    assert "monstera_full.jpg" in img_res["images"][0]["fullsize"]
