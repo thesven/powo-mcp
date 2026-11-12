@@ -12,6 +12,7 @@ Provides authoritative botanical taxonomy, accepted species resolution, lifeform
 
 ## Key Features
 
+- **Native Status & Provenance Verifier**: Directly verify whether a plant is native, introduced, or unrecorded in a given country or region.
 - **Accepted Name & Synonymy Resolution**: Determine whether a botanical name is valid or an outdated synonym, linking directly to the currently accepted taxon.
 - **TDWG Botanical Distribution**: Inspect native vs. introduced/naturalized geographic regions based on international Biodiversity Information Standards (TDWG).
 - **Botanical Metadata**: Extract lifeform descriptions (e.g., *epiphytic climber*, *perennial herb*, *deciduous tree*) and climate preferences.
@@ -27,6 +28,7 @@ Provides authoritative botanical taxonomy, accepted species resolution, lifeform
 | `search_plants` | Search plant names, authors, and families in the Kew POWO database. |
 | `get_plant_details` | Retrieve lifeform, climate, family, and taxonomic status for a plant by POWO ID. |
 | `get_plant_distribution` | Retrieve native and introduced TDWG geographic distribution lists. |
+| `verify_plant_native_status` | Verify whether a plant taxon is native or introduced in a target region or country. |
 | `resolve_plant_synonymy` | Check if a botanical name is accepted or an invalid synonym. |
 
 ---

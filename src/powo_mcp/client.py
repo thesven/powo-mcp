@@ -185,6 +185,54 @@ class PowoClient:
             "fq_id": top.get("fq_id"),
         }
 
+    def verify_plant_native_status(self, query: str, target_region: str) -> dict[str, Any]:
+        """Verify whether a plant taxon is native, introduced, or unrecorded in a target region."""
+        if query.startswith("urn:lsid:ipni.org:names:"):
+            fq_id = query
+        else:
+            matches = self.search_plants(query, limit=5)
+            if not matches:
+                raise PowoError(f"Plant taxon '{query}' not found in Kew POWO database.")
+            fq_id = matches[0]["fq_id"]
+
+        dist = self.get_plant_distribution(fq_id)
+        native_regions = dist.get("native_distribution", [])
+        introduced_regions = dist.get("introduced_distribution", [])
+
+        clean_target = target_region.strip().lower()
+
+        is_native = any(
+            clean_target in r.lower() or r.lower() in clean_target for r in native_regions
+        )
+        is_introduced = any(
+            clean_target in r.lower() or r.lower() in clean_target for r in introduced_regions
+        )
+
+        if is_native:
+            status = "NATIVE"
+            verdict = f"{dist.get('species')} is NATIVE to {target_region}."
+        elif is_introduced:
+            status = "INTRODUCED"
+            verdict = f"{dist.get('species')} is INTRODUCED in {target_region}."
+        else:
+            status = "NOT_RECORDED"
+            verdict = (
+                f"{dist.get('species')} is not recorded as native or introduced in {target_region}."
+            )
+
+        return {
+            "query": query,
+            "species": dist.get("species"),
+            "fq_id": fq_id,
+            "target_region": target_region,
+            "status": status,
+            "is_native": is_native,
+            "is_introduced": is_introduced,
+            "verdict": verdict,
+            "native_distribution": native_regions,
+            "introduced_distribution": introduced_regions,
+        }
+
     def _request(self, path: str, params: dict[str, Any]) -> Any:
         url = f"{self.base_url}{path}"
         with httpx.Client(timeout=self.timeout, transport=self.transport) as client:

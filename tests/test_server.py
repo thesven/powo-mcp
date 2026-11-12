@@ -66,6 +66,7 @@ async def test_server_tools(mock_client: PowoClient) -> None:
     assert "get_plant_details" in tool_names
     assert "get_plant_distribution" in tool_names
     assert "resolve_plant_synonymy" in tool_names
+    assert "verify_plant_native_status" in tool_names
 
     res = await server.call_tool("search_plants", {"query": "Quercus alba"})
     assert "Quercus alba" in res.content[0].text
@@ -80,6 +81,11 @@ async def test_server_tools(mock_client: PowoClient) -> None:
     res = await server.call_tool("resolve_plant_synonymy", {"name": "Quercus alba"})
     assert "ACCEPTED SPECIES" in res.content[0].text
 
+    res = await server.call_tool(
+        "verify_plant_native_status", {"query": "Quercus alba", "target_region": "North America"}
+    )
+    assert "NATIVE" in res.content[0].text
+
 
 @pytest.mark.asyncio
 async def test_server_tool_errors(failing_client: PowoClient) -> None:
@@ -92,4 +98,9 @@ async def test_server_tool_errors(failing_client: PowoClient) -> None:
     assert "failed" in res.content[0].text
 
     res = await server.call_tool("resolve_plant_synonymy", {"name": "NonexistentUnknownPlant"})
+    assert "failed" in res.content[0].text
+
+    res = await server.call_tool(
+        "verify_plant_native_status", {"query": "NonexistentUnknownPlant", "target_region": "Space"}
+    )
     assert "failed" in res.content[0].text

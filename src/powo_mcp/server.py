@@ -102,6 +102,15 @@ def create_server(client: PowoClient | None = None) -> MCPServer:
         except PowoError as exc:
             return {"error": str(exc), "summary": f"Synonymy resolution failed: {exc}"}
 
+    @server.tool()
+    def verify_plant_native_status(query: str, target_region: str) -> dict[str, Any]:
+        """Verify whether a plant taxon is native or introduced in a target region or country."""
+        try:
+            status_data = api.verify_plant_native_status(query=query, target_region=target_region)
+            return {"native_status": status_data, "summary": status_data.get("verdict", "")}
+        except PowoError as exc:
+            return {"error": str(exc), "summary": f"Native status verification failed: {exc}"}
+
     return server
 
 

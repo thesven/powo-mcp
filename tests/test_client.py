@@ -121,3 +121,21 @@ def test_error_handling() -> None:
     client2 = PowoClient(transport=httpx.MockTransport(handler_bad_json))
     with pytest.raises(PowoError, match="No botanical records"):
         client2.resolve_plant_synonymy("NonexistentCreature123")
+
+
+def test_verify_plant_native_status() -> None:
+    client = PowoClient()
+
+    # Native test
+    native_res = client.verify_plant_native_status("Monstera deliciosa", "Mexico")
+    assert native_res["status"] == "NATIVE"
+    assert native_res["is_native"] is True
+
+    # Introduced test
+    intro_res = client.verify_plant_native_status("Taraxacum officinale", "North America")
+    assert intro_res["status"] == "INTRODUCED"
+    assert intro_res["is_introduced"] is True
+
+    # Not recorded test
+    unrec_res = client.verify_plant_native_status("Quercus alba", "Madagascar")
+    assert unrec_res["status"] == "NOT_RECORDED"
