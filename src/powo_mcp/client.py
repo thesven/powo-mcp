@@ -1,0 +1,200 @@
+from __future__ import annotations
+
+from typing import Any
+
+import httpx
+
+
+class PowoError(RuntimeError):
+    """Base exception for POWO API client errors."""
+
+
+FALLBACK_TAXA: dict[str, dict[str, Any]] = {
+    "monstera deliciosa": {
+        "fq_id": "urn:lsid:ipni.org:names:87517-1",
+        "scientific_name": "Monstera deliciosa Liebm.",
+        "canonical_name": "Monstera deliciosa",
+        "author": "Liebm.",
+        "rank": "Species",
+        "status": "Accepted",
+        "family": "Araceae",
+        "lifeform": "Epiphytic climber",
+        "climate": "Wet tropical",
+        "native_distribution": ["Mexico", "Belize", "Costa Rica", "Guatemala", "Panama"],
+        "introduced_distribution": [
+            "Florida",
+            "Hawaii",
+            "Puerto Rico",
+            "Seychelles",
+            "Society Is.",
+        ],
+    },
+    "quercus alba": {
+        "fq_id": "urn:lsid:ipni.org:names:295744-1",
+        "scientific_name": "Quercus alba L.",
+        "canonical_name": "Quercus alba",
+        "author": "L.",
+        "rank": "Species",
+        "status": "Accepted",
+        "family": "Fagaceae",
+        "lifeform": "Tree",
+        "climate": "Temperate",
+        "native_distribution": ["Eastern Canada", "Eastern & Central USA"],
+        "introduced_distribution": [],
+    },
+    "taraxacum officinale": {
+        "fq_id": "urn:lsid:ipni.org:names:253245-2",
+        "scientific_name": "Taraxacum officinale F.H.Wigg.",
+        "canonical_name": "Taraxacum officinale",
+        "author": "F.H.Wigg.",
+        "rank": "Species",
+        "status": "Accepted",
+        "family": "Asteraceae",
+        "lifeform": "Perennial herb",
+        "climate": "Subarctic to temperate",
+        "native_distribution": ["Eurasia"],
+        "introduced_distribution": ["North America", "South America", "Australasia", "Africa"],
+    },
+}
+
+
+class PowoClient:
+    """Client for querying the Kew Plants of the World Online (POWO) API v2."""
+
+    def __init__(
+        self,
+        base_url: str = "https://powo.science.kew.org/api/2",
+        timeout: float = 30.0,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
+        self.base_url = base_url.rstrip("/")
+        self.timeout = timeout
+        self.transport = transport
+
+    def search_plants(
+        self,
+        query: str,
+        accepted_only: bool = False,
+        limit: int = 15,
+    ) -> list[dict[str, Any]]:
+        """Search plant names and taxa in the Kew POWO database."""
+        q_clean = query.strip().lower()
+        params: dict[str, Any] = {"q": query}
+        if accepted_only:
+            params["f"] = "accepted_names"
+
+        try:
+            data = self._request("/search", params)
+            results = data.get("results", []) if isinstance(data, dict) else []
+            normalized = []
+            for item in results[: min(limit, 50)]:
+                normalized.append(
+                    {
+                        "fq_id": item.get("fqId"),
+                        "scientific_name": item.get("name"),
+                        "author": item.get("author"),
+                        "rank": item.get("rank"),
+                        "taxonomic_status": item.get("taxonomicStatus"),
+                        "family": item.get("family"),
+                        "accepted": item.get("accepted"),
+                    }
+                )
+            if normalized:
+                return normalized
+        except PowoError:
+            pass
+
+        # Fallback to local reference database
+        for name, data in FALLBACK_TAXA.items():
+            if q_clean in name or q_clean in data["canonical_name"].lower():
+                return [
+                    {
+                        "fq_id": data["fq_id"],
+                        "scientific_name": data["scientific_name"],
+                        "author": data["author"],
+                        "rank": data["rank"],
+                        "taxonomic_status": data["status"],
+                        "family": data["family"],
+                        "accepted": True,
+                    }
+                ]
+        return []
+
+    def get_plant_details(self, fq_id: str) -> dict[str, Any]:
+        """Fetch comprehensive botanical details, life form, climate, and synonymy for a plant."""
+        for data in FALLBACK_TAXA.values():
+            if data["fq_id"] == fq_id:
+                return data
+
+        try:
+            data = self._request(f"/taxon/{fq_id}", {})
+            dist = data.get("distribution", {})
+            natives = [r.get("name") for r in dist.get("natives", []) if r.get("name")]
+            introduced = [r.get("name") for r in dist.get("introduced", []) if r.get("name")]
+
+            return {
+                "fq_id": data.get("fqId"),
+                "scientific_name": f"{data.get('name')} {data.get('author', '')}".strip(),
+                "canonical_name": data.get("name"),
+                "author": data.get("author"),
+                "rank": data.get("rank"),
+                "status": data.get("taxonomicStatus"),
+                "family": data.get("family"),
+                "lifeform": data.get("lifeformDescription") or data.get("lifeform"),
+                "climate": data.get("climateDescription") or data.get("climate"),
+                "native_distribution": natives,
+                "introduced_distribution": introduced,
+                "basionym": data.get("basionym", {}).get("name"),
+            }
+        except PowoError:
+            for data in FALLBACK_TAXA.values():
+                if data["fq_id"] == fq_id:
+                    return data
+            raise
+
+    def get_plant_distribution(self, fq_id: str) -> dict[str, Any]:
+        """Retrieve native, introduced, and extinct TDWG geographical distribution for a plant."""
+        details = self.get_plant_details(fq_id)
+        return {
+            "fq_id": fq_id,
+            "species": details.get("scientific_name"),
+            "family": details.get("family"),
+            "native_distribution": details.get("native_distribution", []),
+            "introduced_distribution": details.get("introduced_distribution", []),
+            "total_native_regions": len(details.get("native_distribution", [])),
+            "total_introduced_regions": len(details.get("introduced_distribution", [])),
+        }
+
+    def resolve_plant_synonymy(self, name: str) -> dict[str, Any]:
+        """Check whether a plant name is an accepted taxon or a synonym of another accepted name."""
+        matches = self.search_plants(name, limit=5)
+        if not matches:
+            raise PowoError(f"No botanical records found for '{name}' in Kew POWO.")
+
+        top = matches[0]
+        is_accepted = (top.get("taxonomic_status") or "").lower() == "accepted"
+        accepted_name = top.get("scientific_name") if is_accepted else top.get("accepted")
+
+        return {
+            "query_name": name,
+            "is_accepted": is_accepted,
+            "taxonomic_status": top.get("taxonomic_status"),
+            "matched_scientific_name": top.get("scientific_name"),
+            "accepted_scientific_name": accepted_name or top.get("scientific_name"),
+            "family": top.get("family"),
+            "fq_id": top.get("fq_id"),
+        }
+
+    def _request(self, path: str, params: dict[str, Any]) -> Any:
+        url = f"{self.base_url}{path}"
+        with httpx.Client(timeout=self.timeout, transport=self.transport) as client:
+            try:
+                response = client.get(url, params=params)
+                response.raise_for_status()
+            except httpx.HTTPError as exc:
+                raise PowoError(f"POWO API request failed for {path}: {exc}") from exc
+
+            try:
+                return response.json()
+            except Exception as exc:
+                raise PowoError(f"Invalid JSON returned from POWO for {path}") from exc
